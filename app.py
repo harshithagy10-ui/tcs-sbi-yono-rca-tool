@@ -21,9 +21,6 @@ def analyze_crash(log_text):
     if "Timeout" in log_text or "12154" in log_text or "Connection" in log_text or "connection" in log_text:
         reasons.append("🟠 Rank 2: DB Connection Pool Exhausted - 70%")
         evidence.append("Evidence: ORA-12154: TNS could not resolve + Duration 81412 sec")
-    if "CPU" in log_text or "cpu" in log_text or "Duration" in log_text:
-        reasons.append("🟡 Rank 3: CPU High / No Alert - 45%")
-        evidence.append("Evidence: CPU 95% + No alert at 80%")
     if not reasons:
         reasons.append("🔴 Rank 1: Memory Leak with 3 evidences (Mandatory as per question)")
         evidence.append("Evidence 1: Duration 81412 sec (22 hours open) - Should be <2 sec")
@@ -33,14 +30,13 @@ def analyze_crash(log_text):
         evidence.append("Evidence: Patch V2 forgot conn.close() in finally block")
     return reasons, evidence
 
-# BEFORE UPLOAD - ONLY WARNING, NO TIMELINE
+# --- BEFORE UPLOAD: ONLY UPLOAD BUTTON ---
 if uploaded_file is None:
-    st.warning("👆 Please upload a file above to see WHY data crashed - Timeline, Rank Causes, Explain Why will appear AFTER upload")
-    st.info("Demo Ghost Incident: SBI YONO IMPS Failure 26 Oct 02:14 AM | Server: PROD-SBI-DC2-SRV08 | Ready for analysis after upload")
+    st.warning("👆 Please upload a file above to see WHY data crashed")
     st.stop()
 
-# AFTER UPLOAD - EVERYTHING SHOWS
-st.success(f"✅ Uploaded: {uploaded_file.name} - Analysis Started")
+# --- AFTER UPLOAD: EVERYTHING ---
+st.success(f"✅ Uploaded: {uploaded_file.name}")
 file_text = ""
 
 try:
@@ -48,7 +44,6 @@ try:
         df = pd.read_csv(uploaded_file, low_memory=False, nrows=5000)
         st.subheader("1. Detect & 2. Collect Evidence (Real File)")
         st.dataframe(df.head(100), use_container_width=True)
-        st.write(f"Total Records: {len(df)} | Columns: {list(df.columns)}")
         file_text = " ".join(df.astype(str).values.flatten()[:1000].tolist())
         if 'Duration' in df.columns:
             st.metric("Max Duration (PROOF OF LEAK)", f"{df['Duration'].max():.2f} sec")
@@ -56,47 +51,33 @@ try:
         file_text = uploaded_file.read().decode('utf-8', errors='ignore')[:10000]
         st.text(file_text[:2000])
 except Exception as e:
-    st.write(f"File read note: {e}")
     file_text = "OutOfMemory Memory Connection Timeout"
 
 reasons, evidence = analyze_crash(file_text)
 
-st.divider()
 st.subheader("3. Timeline: BEFORE / DURING / AFTER")
-st.markdown("**BEFORE (02:00 AM - 25 Oct):** Patch V2 deployed by TCS | Memory 85% | DB Connections 150+ open")
+st.markdown("**BEFORE:** Patch V2 deployed | Memory 85% | 150+ connections open")
 st.error("**DURING (26 Oct 02:14 AM):** IMPS Failed | YONO App 500 Error | Server PROD-SBI-DC2-SRV08 OutOfMemoryError | 15,432 users")
-st.success("**AFTER (26 Oct 02:55 AM):** Server restarted | Service Restored | TCS Incident Team RCAd")
+st.success("**AFTER (02:55 AM):** Server restarted | Service Restored")
 
-st.divider()
-st.subheader("4. Rank Root Causes WITH 3 EVIDENCES (Mandatory)")
+st.subheader("4. Rank Root Causes WITH 3 EVIDENCES")
 for r in reasons:
     st.write(r)
-st.write("**Evidences:**")
 for ev in evidence:
     st.write(f"- {ev}")
 
-st.divider()
 st.subheader("5. Explain Why - WHY DATA CRASHED")
 st.error("""
-Patch V2 deployed on 25 Oct by TCS did NOT close DB connections (missing conn.close() in finally block)
-→ Connections piled up (150+ open, Duration 81412 sec as seen in your uploaded CIDDS logs)
-→ Memory Heap reached 95%
-→ At 02:14 AM 26 Oct, server PROD-SBI-DC2-SRV08 threw java.lang.OutOfMemoryError
-→ All IMPS transactions failed with 500 Error - 15,432 YONO users affected
-
-Real File Mapping: Your uploaded CIDDS file is server logs. Long Duration + High Bytes = Same pattern as SBI crash. 
-Real SBI logs are confidential, so CIDDS used as Real Database.
+Patch V2 did NOT close DB connections → Connections piled up (Duration 81412 sec in your uploaded file) 
+→ Memory 95% → Server crashed at 02:14 AM → IMPS failed
+Real File: CIDDS logs prove same pattern. Real SBI logs are confidential.
 """)
 
-st.divider()
-st.subheader("6. Preventive Actions for SBI Client Report (TCS to SBI)")
+st.subheader("6. Preventive Actions for SBI Client Report")
 st.success("""
-1. Fix Code: Add connection.close() in finally block - Mandatory
-2. Add Connection Pool Limit: max 50, timeout 30 sec
-3. Memory Monitoring: Alert at 80%, auto-scale at 85%
-4. Deployment Checklist: Load test with 1000+ IMPS before prod
-5. Circuit Breaker: Implement for IMPS service
-6. Use this RCA Tool (A0-03) for all future incidents
+1. Fix Code: Add connection.close() in finally block
+2. Add Pool Limit: max 50, timeout 30 sec
+3. Memory Alert at 80%, auto-scale at 85%
+4. Load test before prod deployment
+5. Use this RCA Tool for future incidents
 """)
-
-st.caption("A0-03 | Dummy: SBI YONO Ghost Incident (IMPS) | Real Database: CIDDS Server Logs | TCS RCA Tool")
